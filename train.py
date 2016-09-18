@@ -87,7 +87,7 @@ def trainer(load_from=None,
 
     tparams = init_tparams(params)
 
-    inps, cost = build_model(tparams, model_options)
+    inps, cost, ext_costs = build_model(tparams, model_options)
 
     print 'Building sentence encoder'
     inps_se, sentences = build_sentence_encoder(tparams, model_options)
@@ -101,8 +101,9 @@ def trainer(load_from=None,
     grads = tensor.grad(cost, wrt=itemlist(tparams))
 
     print 'Building errors..'
-    inps_err, errs = build_errors(model_options)
+    inps_err, errs, dcost = build_errors(tparams, model_options)
     f_err = theano.function(inps_err, errs, profile=False)
+    f_dcost = theano.function(inps_err, dcost, profile=False)
 
     curr_model['f_senc'] = f_senc
     curr_model['f_ienc'] = f_ienc
@@ -156,11 +157,13 @@ def trainer(load_from=None,
 
                 # compute errors
                 dev_errs = compute_errors(curr_model, dev_s, dev_i)
+                dcost_errs = f_dcost(dev_s, dev_i)
 
                 # compute ranking error
                 (r1, r5, r10, medr, meanr), vis_details = t2i(
                     dev_errs, vis_details=True)
                 (r1i, r5i, r10i, medri, meanri) = i2t(dev_errs)
+                print "Discriminator cost: %.3f" % (dcost_errs)
                 print "Text to image: %.1f, %.1f, %.1f, %.1f, %.1f" % (r1, r5, r10, medr, meanr)
                 log.update({'R@1': r1, 'R@5': r5, 'R@10': r10,
                             'median_rank': medr, 'mean_rank': meanr}, n_samples)
@@ -177,20 +180,22 @@ def trainer(load_from=None,
                     print 'Done'
                     vis_details['hyperparams'] = model_options
                     # Save visualization details
-                    with open('vis/roc/%s/%s.json' % (model_options['data'], timestampedName), 'w') as f:
-                        json.dump(vis_details, f)
+                    # TODO Fix this:
+                    #   TypeError, 942 is not JSON serializable
+                    # with open('vis/roc/%s/%s.json' % (model_options['data'], timestampedName), 'w') as f:
+                    # json.dump(vis_details, f)
                     # Add the new model to the index
-                    try:
-                        index = json.load(open('vis/roc/index.json', 'r'))
-                    except IOError:
-                        index = {model_options['data']: []}
+            try:
+                index = json.load(open('vis/roc/index.json', 'r'))
+            except IOError:
+                index = {model_options['data']: []}
 
-                    models = index[model_options['data']]
-                    if timestampedName not in models:
-                        models.append(timestampedName)
+                models = index[model_options['data']]
+                if timestampedName not in models:
+                    models.append(timestampedName)
 
-                    with open('vis/roc/index.json', 'w') as f:
-                        json.dump(index, f)
+                with open('vis/roc/index.json', 'w') as f:
+                    json.dump(index, f)
 
         print 'Seen %d samples' % n_samples
 
