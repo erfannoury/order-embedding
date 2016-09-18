@@ -28,6 +28,10 @@ def init_params(options):
     params = get_layer('ff')[0](options, params, prefix='ff_image', nin=options[
         'dim_image'], nout=options['dim'])
 
+    # Discriminator
+    params = get_layer('ff')[0](
+        options, params, prefix='ff_disc', nin=options['dim'], nout=1)
+
     return params
 
 
@@ -38,13 +42,34 @@ def order_violations(s, im, options):
     return tensor.pow(tensor.maximum(0, s - im), 2)
 
 
+def discriminate(tparams, emb, options):
+    """
+    Apply discriminator to the iamge and sentence embeddings
+    """
+    return get_layer('ff')[1](tparams, emb, options,
+                              prefix='ff_disc', activ='sigmoid')
+
+
+def discriminator_loss(s, im, options):
+    """
+    Computes the disciminator loss
+    """
+    s_disc = tensor.clip(s, 1e-6, 1. - 1e-6)
+    im_disc = tensor.clip(im, 1e-6, 1. - 1e-6)
+    im_loss = tensor.nnet.binary_crossentropy(
+        im_disc, tensor.zeros_like(im_disc)).mean()
+    s_loss = tensor.nnet.binary_crossentropy(
+        s_disc, tensor.ones_like(s_disc)).mean()
+    return -options['disc_coeff'] * (im_loss + s_loss)
+
+
 def contrastive_loss(s, im, options):
     """
     For a minibatch of sentence and image embeddings, compute the pairwise contrastive loss
     """
     margin = options['margin']
 
-    if options['method'] == 'order':
+    if options['method'] in ['order', 'order_discriminator']:
         im2 = im.dimshuffle(('x', 0, 1))
         s2 = s.dimshuffle((0, 'x', 1))
         errors = order_violations(s2, im2, options).sum(axis=2)
@@ -109,10 +134,20 @@ def build_model(tparams, options):
     s_emb = encode_sentences(tparams, options, x, mask)
     im_emb = encode_images(tparams, options, im)
 
-    # Compute loss
-    cost = contrastive_loss(s_emb, im_emb, options)
+    # discriminate sentence and image embeddings
+    s_disc = discriminate(tparams, s_emb, options)
+    im_disc = discriminate(tparams, im_emb, options)
 
-    return [x, mask, im], cost
+    # Contrastive loss
+    ccost = contrastive_loss(s_emb, im_emb, options)
+
+    # Discriminatore loss
+    dcost = discriminator_loss(s_disc, im_disc, options)
+
+    # Total cost
+    cost = ccost + dcost
+
+    return [x, mask, im], cost, [ccost, dcost]
 
 
 def build_sentence_encoder(tparams, options):
@@ -136,14 +171,14 @@ def build_image_encoder(tparams, options):
     return [im], encode_images(tparams, options, im)
 
 
-def build_errors(options):
+def build_errors(tparams, options):
     """ Given sentence and image embeddings, compute the error matrix """
     # input features
     s_emb = tensor.matrix('s_emb', dtype='float32')
     im_emb = tensor.matrix('im_emb', dtype='float32')
 
     errs = None
-    if options['method'] == 'order':
+    if options['method'] in ['order', 'order_discriminator']:
         # trick to make Theano not optimize this into a single matrix op, and
         # overflow memory
         indices = tensor.arange(s_emb.shape[0])
@@ -153,4 +188,9 @@ def build_errors(options):
     else:
         errs = - tensor.dot(s_emb, im_emb.T)
 
-    return [s_emb, im_emb], errs
+    s_disc = discriminate(tparams, s_emb, options)
+    im_disc = discriminate(tparams, im_emb, options)
+
+    dcost = discriminator_loss(s_disc, im_disc, options)
+
+    return [s_emb, im_emb], errs, dcost
