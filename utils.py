@@ -113,6 +113,13 @@ def linear(x):
     return x
 
 
+def sigmoid(x):
+    """
+    Sigmoid activation function
+    """
+    return tensor.nnet.sigmoid(x)
+
+
 def l2norm(X):
     """
     Compute L2 norm, row-wise
