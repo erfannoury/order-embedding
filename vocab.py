@@ -4,6 +4,7 @@ Constructing dictionaries
 import numpy
 from collections import OrderedDict
 
+
 def build_dictionary(text):
     """
     Build a dictionary (mapping of tokens to indices)
@@ -22,6 +23,6 @@ def build_dictionary(text):
 
     worddict = OrderedDict()
     for idx, sidx in enumerate(sorted_idx):
-        worddict[words[sidx]] = idx+2  # 0: <eos>, 1: <unk>
+        worddict[words[sidx]] = idx + 2  # 0: <eos>, 1: <unk>
 
     return worddict

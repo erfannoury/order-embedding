@@ -19,7 +19,8 @@ def process_dataset(dataset, net, gpu_id):
         split = im['split']
         if split == 'restval':
             split = 'train'
-        splits[split].append(images_dir[dataset] + im['filepath'] + '/' + im['filename'])
+        splits[split].append(images_dir[dataset] +
+                             im['filepath'] + '/' + im['filename'])
 
     for name, filenames in splits.items():
         run(dataset + '_' + name, filenames, net, gpu_id, data_dir + 'images/')
@@ -45,12 +46,10 @@ def run(split_name, filenames, net, gpu_id, output_dir):
     # set up pre-processor
     transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
 
-    transformer.set_transpose('data', (2,0,1))
-    transformer.set_channel_swap('data', (2,1,0))
+    transformer.set_transpose('data', (2, 0, 1))
+    transformer.set_channel_swap('data', (2, 1, 0))
     transformer.set_mean('data', net_data['mean'])
     transformer.set_raw_scale('data', 255)
-
-
 
     feat_shape = [len(filenames)] + list(net.blobs[layer].data.shape[1:])
     print("Shape of features to be computed: " + str(feat_shape))
@@ -59,15 +58,14 @@ def run(split_name, filenames, net, gpu_id, output_dir):
     for key in ['1crop', '10crop']:
         feats[key] = numpy.zeros(feat_shape).astype('float32')
 
-
     for k in range(len(filenames)):
         print('Image %i/%i' % (k, len(filenames)))
         im = caffe.io.load_image(filenames[k])
         h, w, _ = im.shape
         if h < w:
-            im = caffe.io.resize_image(im, (256, 256*w/h))
+            im = caffe.io.resize_image(im, (256, 256 * w / h))
         else:
-             im = caffe.io.resize_image(im, (256*h/w, 256))
+            im = caffe.io.resize_image(im, (256 * h / w, 256))
 
         crops = caffe.io.oversample([im], (width, height))
 
@@ -88,7 +86,6 @@ def run(split_name, filenames, net, gpu_id, output_dir):
             else:
                 f[k] = output[4]  # just center crop
 
-
     print("Saving features...")
     for methodname, f in feats.items():
         f = sklearn.preprocessing.normalize(f)
@@ -100,18 +97,3 @@ def run(split_name, filenames, net, gpu_id, output_dir):
             pass
 
         numpy.save(method_dir + '/%s.npy' % split_name, f)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -2,6 +2,7 @@ import numpy
 from collections import defaultdict
 import random
 
+
 class Datasource():
     """
     Wrapper around a dataset which permits
@@ -52,7 +53,8 @@ class Datasource():
         seqs = []
         for i in indices:
             cc = self.data['caps'][i]
-            seqs.append([self.worddict[w] if w in self.worddict else 1 for w in cc.split()])
+            seqs.append(
+                [self.worddict[w] if w in self.worddict else 1 for w in cc.split()])
 
         lengths = map(len, seqs)
         n_samples = len(seqs)
@@ -64,7 +66,6 @@ class Datasource():
         x_mask = numpy.zeros((maxlen, n_samples)).astype('float32')
         for idx, s in enumerate(seqs):
             x[:lengths[idx], idx] = s
-            x_mask[:lengths[idx]+1, idx] = 1.
+            x_mask[:lengths[idx] + 1, idx] = 1.
 
         return x, x_mask
-

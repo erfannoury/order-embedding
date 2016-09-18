@@ -12,8 +12,6 @@ symmetric = {
     'abs': False,
 }
 
-
-
 default_params = {
     'max_epochs': 100,
     'data': 'coco',

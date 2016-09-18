@@ -24,8 +24,9 @@ def load_json(file):
     with open(name, 'r') as f:
         return json.load(f)
 
+
 class Log:
-    def __init__(self, name, hyperparams, saveDir, xLabel = "Iterations", saveFrequency = 0):
+    def __init__(self, name, hyperparams, saveDir, xLabel="Iterations", saveFrequency=0):
         self.name = name
         self.hyperparams = hyperparams
         self.xLabel = xLabel
@@ -43,7 +44,6 @@ class Log:
                   if filename.endswith('json') and filename != "index.json"]
 
         write_json(indexLoc, models)
-
 
     def update(self, ys, x=None):
         """ adds the data point (x, ys), where ys is a dictionary of different statistics to keep track of """
@@ -71,4 +71,3 @@ class Log:
             'data': self.data,
             'stats': stats
         })
-

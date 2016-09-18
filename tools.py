@@ -12,6 +12,7 @@ from scipy.linalg import norm
 from utils import load_params, init_tparams
 from model import init_params, build_sentence_encoder, build_image_encoder, build_errors
 
+
 def load_model(path_to_model):
     """
     Load all model components
@@ -42,7 +43,7 @@ def load_model(path_to_model):
 
     print 'Compiling error computation...'
     [s, im], errs = build_errors(options)
-    f_err = theano.function([s,im], errs, name='f_err')
+    f_err = theano.function([s, im], errs, name='f_err')
 
     # Store everything we need in a dictionary
     print 'Packing up...'
@@ -50,6 +51,7 @@ def load_model(path_to_model):
     model['f_ienc'] = f_ienc
     model['f_err'] = f_err
     return model
+
 
 def encode_sentences(model, X, verbose=False, batch_size=128):
     """
@@ -63,7 +65,8 @@ def encode_sentences(model, X, verbose=False, batch_size=128):
     for i, s in enumerate(captions):
         ds[len(s)].append(i)
 
-    # Get features. This encodes by length, in order to avoid wasting computation
+    # Get features. This encodes by length, in order to avoid wasting
+    # computation
     for k in ds.keys():
         if verbose:
             print k
@@ -74,18 +77,20 @@ def encode_sentences(model, X, verbose=False, batch_size=128):
 
             seqs = []
             for i, cc in enumerate(caption):
-                seqs.append([model['worddict'][w] if w in model['worddict'] and model['worddict'][w] < model['options']['n_words'] else 1 for w in cc])
-            x = numpy.zeros((k+1, len(caption))).astype('int64')
-            x_mask = numpy.zeros((k+1, len(caption))).astype('float32')
+                seqs.append([model['worddict'][w] if w in model['worddict'] and model[
+                            'worddict'][w] < model['options']['n_words'] else 1 for w in cc])
+            x = numpy.zeros((k + 1, len(caption))).astype('int64')
+            x_mask = numpy.zeros((k + 1, len(caption))).astype('float32')
             for idx, s in enumerate(seqs):
-                x[:k,idx] = s
-                x_mask[:k+1,idx] = 1.
-            
+                x[:k, idx] = s
+                x_mask[:k + 1, idx] = 1.
+
             ff = model['f_senc'](x, x_mask)
             for ind, c in enumerate(caps):
                 features[c] = ff[ind]
 
     return features
+
 
 def encode_images(model, IM):
     """
@@ -99,9 +104,3 @@ def compute_errors(model, s, im):
     Computes errors between each sentence and caption
     """
     return model['f_err'](s, im)
-
-
-
-
-
-

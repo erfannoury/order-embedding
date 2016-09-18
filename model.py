@@ -10,6 +10,7 @@ from collections import OrderedDict
 from utils import _p, ortho_weight, norm_weight, xavier_weight, tanh, l2norm
 from layers import get_layer, param_init_fflayer, fflayer, param_init_gru, gru_layer
 
+
 def init_params(options):
     """
     Initialize all parameters
@@ -24,7 +25,8 @@ def init_params(options):
                                               nin=options['dim_word'], dim=options['dim'])
 
     # Image encoder
-    params = get_layer('ff')[0](options, params, prefix='ff_image', nin=options['dim_image'], nout=options['dim'])
+    params = get_layer('ff')[0](options, params, prefix='ff_image', nin=options[
+        'dim_image'], nout=options['dim'])
 
     return params
 
@@ -47,12 +49,16 @@ def contrastive_loss(s, im, options):
         s2 = s.dimshuffle((0, 'x', 1))
         errors = order_violations(s2, im2, options).sum(axis=2)
     elif options['method'] == 'cosine':
-        errors = - tensor.dot(im, s.T) # negative because error is the opposite of (cosine) similarity
+        # negative because error is the opposite of (cosine) similarity
+        errors = - tensor.dot(im, s.T)
 
     diagonal = errors.diagonal()
 
-    cost_s = tensor.maximum(0, margin - errors + diagonal)  # compare every diagonal score to scores in its column (all contrastive images for each sentence)
-    cost_im = tensor.maximum(0, margin - errors + diagonal.reshape((-1, 1)))  # all contrastive sentences for each image
+    # compare every diagonal score to scores in its column (all contrastive
+    # images for each sentence)
+    cost_s = tensor.maximum(0, margin - errors + diagonal)
+    # all contrastive sentences for each image
+    cost_im = tensor.maximum(0, margin - errors + diagonal.reshape((-1, 1)))
 
     cost_tot = cost_s + cost_im
 
@@ -67,7 +73,8 @@ def encode_sentences(tparams, options, x, mask):
     n_samples = x.shape[1]
 
     # Word embedding (source)
-    emb = tparams['Wemb'][x.flatten()].reshape([n_timesteps, n_samples, options['dim_word']])
+    emb = tparams['Wemb'][x.flatten()].reshape(
+        [n_timesteps, n_samples, options['dim_word']])
 
     # Encode sentences (source)
     proj = get_layer(options['encoder'])[1](tparams, emb, None, options,
@@ -79,15 +86,15 @@ def encode_sentences(tparams, options, x, mask):
 
     return s
 
+
 def encode_images(tparams, options, im):
-    im_emb = get_layer('ff')[1](tparams, im, options, prefix='ff_image', activ='linear')
+    im_emb = get_layer('ff')[1](tparams, im, options,
+                                prefix='ff_image', activ='linear')
     im_emb = l2norm(im_emb)
     if options['abs']:
         im_emb = abs(im_emb)
 
     return im_emb
-
-
 
 
 def build_model(tparams, options):
@@ -108,7 +115,6 @@ def build_model(tparams, options):
     return [x, mask, im], cost
 
 
-
 def build_sentence_encoder(tparams, options):
     """
     Encoder only, for sentences
@@ -119,13 +125,14 @@ def build_sentence_encoder(tparams, options):
 
     return [x, mask], encode_sentences(tparams, options, x, mask)
 
+
 def build_image_encoder(tparams, options):
     """
     Encoder only, for images
     """
     # image features
     im = tensor.matrix('im', dtype='float32')
-    
+
     return [im], encode_images(tparams, options, im)
 
 
@@ -137,7 +144,8 @@ def build_errors(options):
 
     errs = None
     if options['method'] == 'order':
-        # trick to make Theano not optimize this into a single matrix op, and overflow memory
+        # trick to make Theano not optimize this into a single matrix op, and
+        # overflow memory
         indices = tensor.arange(s_emb.shape[0])
         errs, _ = theano.map(lambda i, s, im: order_violations(s[i], im, options).sum(axis=1).flatten(),
                              sequences=[indices],
@@ -146,6 +154,3 @@ def build_errors(options):
         errs = - tensor.dot(s_emb, im_emb.T)
 
     return [s_emb, im_emb], errs
-
-
-

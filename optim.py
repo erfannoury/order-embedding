@@ -5,9 +5,11 @@ import theano
 import theano.tensor as tensor
 import numpy
 
+
 # name(hyperp, tparams, grads, inputs (list), cost) = f_grad_shared, f_update
 def adam(lr, tparams, grads, inp, cost):
-    gshared = [theano.shared(p.get_value() * 0., name='%s_grad'%k) for k, p in tparams.iteritems()]
+    gshared = [theano.shared(p.get_value() * 0., name='%s_grad' % k)
+               for k, p in tparams.iteritems()]
     gsup = [(gs, g) for gs, g in zip(gshared, grads)]
 
     f_grad_shared = theano.function(inp, cost, updates=gsup, profile=False)
@@ -36,7 +38,7 @@ def adam(lr, tparams, grads, inp, cost):
         updates.append((p, p_t))
     updates.append((i, i_t))
 
-    f_update = theano.function([lr], [], updates=updates, on_unused_input='ignore', profile=False)
+    f_update = theano.function(
+        [lr], [], updates=updates, on_unused_input='ignore', profile=False)
 
     return f_grad_shared, f_update
-

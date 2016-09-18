@@ -10,6 +10,7 @@ import datasets
 from datasource import Datasource
 import tools
 
+
 def ranking_eval_5fold(model, split='dev'):
     """
     Evaluate a trained model on either dev or test of the dataset it was trained on
@@ -30,7 +31,6 @@ def ranking_eval_5fold(model, split='dev'):
         i_emb = tools.encode_images(model, ims)
 
         errs = tools.compute_errors(model, c_emb, i_emb)
-
 
         r = t2i(errs)
         print "Text to image: %.1f, %.1f, %.1f, %.1f, %.1f" % tuple(r)
@@ -55,14 +55,13 @@ def t2i(c2i, vis_details=False):
 
     ranks = numpy.zeros(c2i.shape[0])
 
-
     vis_dict = {'sentences': []}
 
     for i in range(len(ranks)):
         d_i = c2i[i]
         inds = numpy.argsort(d_i)
 
-        rank = numpy.where(inds == i/5)[0][0]
+        rank = numpy.where(inds == i / 5)[0][0]
         ranks[i] = rank
 
         def image_dict(k):
@@ -72,7 +71,7 @@ def t2i(c2i, vis_details=False):
             vis_dict['sentences'].append({
                 'id': i,
                 'rank': rank + 1,
-                'gt_image': image_dict(i/5),
+                'gt_image': image_dict(i / 5),
                 'top_images': map(image_dict, inds[:10])
             })
 
@@ -88,7 +87,8 @@ def t2i(c2i, vis_details=False):
     if not vis_details:
         return stats
     else:
-        vis_dict['stats'] = {'R@1': r1, 'R@5': r5, 'R@10': r10, 'median_rank': medr, 'mean_rank': meanr}
+        vis_dict['stats'] = {'R@1': r1, 'R@5': r5,
+                             'R@10': r10, 'median_rank': medr, 'mean_rank': meanr}
         return stats, vis_dict
 
 
@@ -104,7 +104,7 @@ def i2t(c2i):
         d_i = c2i[:, i]
         inds = numpy.argsort(d_i)
 
-        rank = numpy.where(inds/5 == i)[0][0]
+        rank = numpy.where(inds / 5 == i)[0][0]
         ranks[i] = rank
 
     # Compute metrics

@@ -6,6 +6,7 @@ import json
 
 root_dir = '/u/vendrov/qanda/hierarchy/'
 
+
 def process_dataset(dataset):
     data_dir = root_dir + dataset
     data = json.load(open('%s/dataset_%s.json' % (data_dir, dataset), 'r'))
@@ -23,5 +24,3 @@ def process_dataset(dataset):
         with open(data_dir + '/' + name + '.txt', 'w') as f:
             for tokens in split:
                 f.write(' '.join(tokens) + '\n')
-
-
