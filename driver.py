@@ -4,7 +4,8 @@ orderdisc = {
     'method': 'order_discriminator',
     'margin': 0.05,
     'abs': True,
-    'disc_coeff': 0.1
+    'disc_coeff': 1.0,
+    'disc_hid_size': 256 
 }
 
 order = {
