@@ -6,7 +6,7 @@ import theano.tensor as tensor
 
 import numpy
 
-from utils import _p, ortho_weight, norm_weight, xavier_weight, tanh, linear, sigmoid
+from utils import _p, ortho_weight, norm_weight, xavier_weight, tanh, linear, sigmoid, relu
 
 # layers: 'name': ('parameter initializer', 'feedforward')
 layers = {'ff': ('param_init_fflayer', 'fflayer'),

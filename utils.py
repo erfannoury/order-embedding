@@ -120,6 +120,13 @@ def sigmoid(x):
     return tensor.nnet.sigmoid(x)
 
 
+def relu(x):
+    """
+    ReLU activation function
+    """
+    return tensor.nnet.relu(x)
+
+
 def l2norm(X):
     """
     Compute L2 norm, row-wise
