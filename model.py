@@ -29,8 +29,10 @@ def init_params(options):
         'dim_image'], nout=options['dim'])
 
     # Discriminator
+    params = get_layer('ff')[0](options, params, prefix='ff_disc_hid', nin=options[
+        'dim'], nout=options['disc_hid_size'])
     params = get_layer('ff')[0](
-        options, params, prefix='ff_disc', nin=options['dim'], nout=1)
+        options, params, prefix='ff_disc', nin=options['disc_hid_size'], nout=1)
 
     return params
 
@@ -44,9 +46,11 @@ def order_violations(s, im, options):
 
 def discriminate(tparams, emb, options):
     """
-    Apply discriminator to the iamge and sentence embeddings
+    Apply discriminator to the image and sentence embeddings
     """
-    return get_layer('ff')[1](tparams, emb, options,
+    hid = get_layer('ff')[1](tparams, emb, options,
+                             prefix='ff_disc_hid', activ='tanh')
+    return get_layer('ff')[1](tparams, hid, options,
                               prefix='ff_disc', activ='sigmoid')
 
 
@@ -192,5 +196,7 @@ def build_errors(tparams, options):
     im_disc = discriminate(tparams, im_emb, options)
 
     dcost = discriminator_loss(s_disc, im_disc, options)
+
+    errs += dcost
 
     return [s_emb, im_emb], errs, dcost
