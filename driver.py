@@ -1,5 +1,4 @@
-import train
-
+import trainlasagne
 orderdisc = {
     'method': 'order_discriminator',
     'margin': 0.05,
@@ -37,13 +36,15 @@ default_params = {
 }
 
 
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('model', choices=['order', 'symmetric', 'orderdisc'])
-args = parser.parse_args()
-model_params = eval(args.model)
+# import argparse
+# parser = argparse.ArgumentParser()
+# parser.add_argument('model', choices=['order', 'symmetric', 'orderdisc'])
+# args = parser.parse_args()
+# model_params = eval(args.model)
+model_params = orderdisc
 
 model_params.update(default_params)
 
 name = model_params['method']
-train.trainer(name=name, **model_params)
+trainlasagne.lasagnetrainer(name=name, **model_params)
+# train.trainer(name=name, **model_params)
