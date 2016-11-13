@@ -1,26 +1,46 @@
 """
-Main trainer function
+Lasagne trainer function
 """
-import theano
-import lasagne
 import cPickle as pkl
 import json
-
+from collections import defaultdict
 import os
 import time
+import numpy
+import theano
+import lasagne
+from theano import tensor
 
 import datasource
-
-from utils import *
-from optim import adam
-from model import init_params, build_errors, contrastive_loss, discriminator_loss
+from utils import l2norm, maxnorm
+from model import contrastive_loss, discriminator_loss, order_violations
 from vocab import build_dictionary
 from evaluation import t2i, i2t
-from tools import encode_sentences, encode_images, compute_errors
 from datasets import load_dataset
 
 
+def build_errors(options):
+    """ Given sentence and image embeddings, compute the error matrix """
+    # input features
+    s_emb = tensor.matrix('s_emb', dtype='float32')
+    im_emb = tensor.matrix('im_emb', dtype='float32')
+
+    errs = None
+    if options['method'] in ['order', 'order_discriminator']:
+        # trick to make Theano not optimize this into a single matrix op, and
+        # overflow memory
+        indices = tensor.arange(s_emb.shape[0])
+        errs, _ = theano.map(lambda i, s, im: order_violations(s[i], im, None).sum(axis=1).flatten(),
+                             sequences=[indices],
+                             non_sequences=[s_emb, im_emb])
+    else:
+        errs = - tensor.dot(s_emb, im_emb.T)
+
+    return theano.function([s_emb, im_emb], errs)
+
 # main trainer
+
+
 def lasagnetrainer(load_from=None,
                    save_dir='snapshots',
                    name='anon',
@@ -99,9 +119,11 @@ def lasagnetrainer(load_from=None,
     unif_gate = lasagne.layers.Gate(
         W_cell=None, W_in=lasagne.init.Uniform(0.1), W_hid=lasagne.init.Uniform(0.1))
 
+    # transpose `x` because of the way data is handled in DataSource class
     l_in_sent = lasagne.layers.InputLayer((None, None), input_var=x.T)
     l_in_im = lasagne.layers.InputLayer(
         (None, model_options['dim_image']), input_var=im)
+    # transpose `mask` because of the way data is handled in DataSource class
     l_in_mask = lasagne.layers.InputLayer((None, None), input_var=mask.T)
 
     l_emb = lasagne.layers.EmbeddingLayer(
@@ -161,6 +183,8 @@ def lasagnetrainer(load_from=None,
     dcost = discriminator_loss(s_disc, im_disc, model_options)
     cost = ccost + dcost
 
+    # Building the error matrix between a pair of captions and images
+
     #############################################################
     # inps, cost, ext_costs = build_model(tparams, model_options)
     #############################################################
@@ -201,7 +225,7 @@ def lasagnetrainer(load_from=None,
 
     curr_model['f_senc'] = f_senc
     curr_model['f_ienc'] = f_ienc
-    curr_model['f_err'] = f_err
+    curr_model['f_err'] = build_errors(curr_model['options'])
 
     if model_options['grad_clip'] > 0.:
         grads = [maxnorm(g, model_options['grad_clip']) for g in grads]
@@ -237,7 +261,6 @@ def lasagnetrainer(load_from=None,
             # cost = f_grad_shared(x, mask, im)
             # f_update(model_options['lrate'])
             ####################################
-            print 'x.shape: {}, mask.shape: {}, im.shape: {}'.format(x.shape, mask.shape, im.shape)
             cost = f_err(x, mask, im)
             f_update(x, mask, im)
             ud = time.time() - ud_start
@@ -253,21 +276,49 @@ def lasagnetrainer(load_from=None,
             if numpy.mod(uidx, model_options['validFreq']) == 0:
 
                 print 'Computing results...'
-
+                ###############################################################
                 # encode sentences efficiently
-                dev_s = encode_sentences(
-                    curr_model, dev_caps, batch_size=model_options['batch_size'])
-                dev_i = encode_images(curr_model, dev_ims)
-
+                # dev_s = encode_sentences(
+                # curr_model, dev_caps, batch_size=model_options['batch_size'])
+                # dev_i = encode_images(curr_model, dev_ims)
+                #
                 # compute errors
-                dev_errs = compute_errors(curr_model, dev_s, dev_i)
-                dcost_errs = f_dcost(dev_s, dev_i)
-
+                # dev_errs = compute_errors(curr_model, dev_s, dev_i)
+                # dcost_errs = f_dcost(dev_s, dev_i)
+                ###############################################################
+                dev_semb = numpy.zeros(
+                    (len(dev_caps), curr_model['options']['dim']), dtype='float32')
+                ds = defaultdict(list)
+                captions = [s.split() for s in dev_caps]
+                for i, s in enumerate(captions):
+                    ds[len(s)].append(i)
+                # Get features. This encodes by length, in order to avoid
+                # wasting computation
+                for k in ds.keys():
+                    numbatches = len(ds[k]) / model_options['batch_size'] + 1
+                    for minibatch in range(numbatches):
+                        caps = ds[k][minibatch::numbatches]
+                        caption = [captions[c] for c in caps]
+                        seqs = []
+                        for i, cc in enumerate(caption):
+                            seqs.append([curr_model['worddict'][w] if w in curr_model['worddict'] and curr_model[
+                                        'worddict'][w] < model_options['n_words'] else 1 for w in cc])
+                        x = numpy.zeros((k + 1, len(caption)), dtype='int64')
+                        x_mask = numpy.zeros_like(x, dtype='int8')
+                        for idx, s in enumerate(seqs):
+                            x[:k, idx] = s
+                            x_mask[:k + 1, idx] = 1
+                        ff = curr_model['f_senc'](x, x_mask)
+                        for ind, c in enumerate(caps):
+                            dev_semb[c] = ff[ind]
+                dev_iemb = curr_model['f_ienc'](dev_ims)
+                dev_errors = curr_model['f_err'](dev_semb, dev_iemb)
                 # compute ranking error
+                print 'computing ranking error'
                 (r1, r5, r10, medr, meanr), vis_details = t2i(
-                    dev_errs, vis_details=True)
-                (r1i, r5i, r10i, medri, meanri) = i2t(dev_errs)
-                print "Discriminator cost: %.3f" % (dcost_errs)
+                    dev_errors, vis_details=True)
+                (r1i, r5i, r10i, medri, meanri) = i2t(dev_errors)
+                # print "Discriminator cost: %.3f" % (dcost_errs)
                 print "Text to image: %.1f, %.1f, %.1f, %.1f, %.1f" % (r1, r5, r10, medr, meanr)
                 log.update({'R@1': r1, 'R@5': r5, 'R@10': r10,
                             'median_rank': medr, 'mean_rank': meanr}, n_samples)
@@ -279,8 +330,11 @@ def lasagnetrainer(load_from=None,
                 if tot > curr:
                     curr = tot
                     # Save parameters
-                    print 'Saving...',
-                    numpy.savez('%s/%s' % (save_dir, name), **unzip(tparams))
+                    # TODO Fix this, save params
+                    ###########################################################
+                    # print 'Saving...',
+                    # numpy.savez('%s/%s' % (save_dir, name), **unzip(tparams))
+                    ###########################################################
                     print 'Done'
                     vis_details['hyperparams'] = model_options
                     # Save visualization details
